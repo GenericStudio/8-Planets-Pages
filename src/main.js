@@ -8,8 +8,9 @@ const planetDescription = document.querySelector('#planet-description');
 const prevPlanetButton = document.querySelector('#prev-planet');
 const nextPlanetButton = document.querySelector('#next-planet');
 const versionIndicator = document.querySelector('#version-indicator');
+const labelsLayer = document.querySelector('#labels-layer');
 
-const APP_VERSION = 'v2026.03.04.5';
+const APP_VERSION = 'v2026.03.04.6';
 
 if (versionIndicator) {
   versionIndicator.textContent = `Version: ${APP_VERSION}`;
@@ -64,6 +65,7 @@ const sun = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: '#ffcf63', emissive: '#ff9d2a', emissiveIntensity: 1.2 })
 );
 scene.add(sun);
+registerLabel('Sun', sun, '#ffd587');
 
 const planetConfigs = [
   { name: 'Mercury', size: 1.2, distance: 11, color: '#f2c89b', speed: 1.6, fact: 'Fast little bean and closest to the Sun.' },
@@ -125,6 +127,53 @@ const previousFocusPlanetPosition = new THREE.Vector3();
 const focusPlanetDelta = new THREE.Vector3();
 let hasFocusReference = false;
 const moonBodies = [];
+const labels = [];
+const labelWorldPosition = new THREE.Vector3();
+const projectedLabelPosition = new THREE.Vector3();
+const faceOffsetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+const lookAtMatrix = new THREE.Matrix4();
+const desiredPlanetQuaternion = new THREE.Quaternion();
+
+function registerLabel(name, target, color = '#f4f7ff') {
+  if (!labelsLayer) {
+    return;
+  }
+
+  const element = document.createElement('span');
+  element.className = 'space-label';
+  element.textContent = name;
+  element.style.color = color;
+  labelsLayer.append(element);
+  labels.push({ target, element });
+}
+
+function updateLabels() {
+  if (!labelsLayer) {
+    return;
+  }
+
+  for (const { target, element } of labels) {
+    target.getWorldPosition(labelWorldPosition);
+    projectedLabelPosition.copy(labelWorldPosition).project(camera);
+
+    const onScreen = projectedLabelPosition.z > -1 && projectedLabelPosition.z < 1;
+    if (!onScreen) {
+      element.style.display = 'none';
+      continue;
+    }
+
+    const x = (projectedLabelPosition.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (projectedLabelPosition.y * -0.5 + 0.5) * window.innerHeight;
+    element.style.display = 'inline-flex';
+    element.style.transform = `translate(${x + 16}px, ${y - 14}px)`;
+  }
+}
+
+function orientPlanetFaceToCamera(planet, delta) {
+  lookAtMatrix.lookAt(planet.getWorldPosition(labelWorldPosition), camera.position, planet.up);
+  desiredPlanetQuaternion.setFromRotationMatrix(lookAtMatrix).multiply(faceOffsetQuaternion);
+  planet.quaternion.slerp(desiredPlanetQuaternion, Math.min(1, delta * 4.2));
+}
 
 function createEye(radius, side) {
   const eyeRoot = new THREE.Group();
@@ -205,9 +254,11 @@ function createMoon(planet, config) {
     new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.88, metalness: 0.03 })
   );
   moon.position.x = config.distance;
+  moon.userData = { ...config };
   moonPivot.add(moon);
 
   moonBodies.push({ moonPivot, moon, speed: config.speed, baseRotation: Math.random() * Math.PI * 2 });
+  registerLabel(config.name, moon, config.color);
 }
 
 function createAsteroidBelt({ innerRadius, outerRadius, count, spread, color }) {
@@ -370,6 +421,7 @@ function setActivePlanet(planet, options = {}) {
   const { snap = false } = options;
 
   activeFocus = planet;
+  activeFocus.userData.autoFace = true;
   activeIndex = planet.userData.idx;
   planetName.textContent = planet.userData.name;
   planetDescription.textContent = planet.userData.fact;
@@ -438,9 +490,10 @@ for (const [idx, config] of planetConfigs.entries()) {
   }
 
   planet.position.x = config.distance;
-  planet.userData = { ...config, idx, pivot, faceData };
+  planet.userData = { ...config, idx, pivot, faceData, autoFace: false };
   pivot.add(planet);
   planets.push(planet);
+  registerLabel(config.name, planet, config.color);
 
   const button = document.createElement('button');
   button.type = 'button';
@@ -488,6 +541,7 @@ for (const [idx, config] of dwarfPlanetConfigs.entries()) {
   pivot.rotation.y = idx * 0.9;
   pivot.add(dwarfPlanet);
   dwarfPlanets.push(dwarfPlanet);
+  registerLabel(config.name, dwarfPlanet, config.color);
 }
 
 setActivePlanet(planets[2], { snap: true });
@@ -515,6 +569,9 @@ window.addEventListener('resize', () => {
 
 controls.addEventListener('start', () => {
   cameraTransition.active = false;
+  if (activeFocus) {
+    activeFocus.userData.autoFace = false;
+  }
 });
 
 const clock = new THREE.Clock();
@@ -526,9 +583,14 @@ function animate() {
   const elapsed = elapsedTime;
 
   planets.forEach((planet) => {
-    const { speed, idx, pivot, faceData } = planet.userData;
+    const { speed, idx, pivot, faceData, autoFace } = planet.userData;
     pivot.rotation.y = elapsed * speed * 0.3;
-    planet.rotation.y += 0.01 + idx * 0.0008;
+
+    if (planet === activeFocus && autoFace) {
+      orientPlanetFaceToCamera(planet, delta);
+    } else {
+      planet.rotation.y += 0.01 + idx * 0.0008;
+    }
 
     planet.worldToLocal(worldCameraPosition.copy(camera.position));
     const eyeLookX = THREE.MathUtils.clamp(worldCameraPosition.x / planet.userData.size, -0.5, 0.5);
@@ -604,6 +666,7 @@ function animate() {
     previousFocusPlanetPosition.copy(currentFocusPlanetPosition);
   }
 
+  updateLabels();
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
