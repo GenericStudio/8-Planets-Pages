@@ -73,26 +73,76 @@ const planets = [];
 const buttonsByName = new Map();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
+const worldCameraPosition = new THREE.Vector3();
 let activeFocus = null;
 let activeIndex = 0;
 
+function createEye(radius, side) {
+  const eyeRoot = new THREE.Group();
+  eyeRoot.position.set(radius * 0.34 * side, radius * 0.16, radius * 0.92);
+
+  const white = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.16, 20, 20),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.45, metalness: 0.02 })
+  );
+
+  const pupilAnchor = new THREE.Group();
+  pupilAnchor.position.z = radius * 0.125;
+  white.add(pupilAnchor);
+
+  const pupil = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.07, 16, 16),
+    new THREE.MeshStandardMaterial({ color: '#0f1940', roughness: 0.4, metalness: 0.1 })
+  );
+  pupilAnchor.add(pupil);
+
+  const sparkle = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.02, 12, 12),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.25 })
+  );
+  sparkle.position.set(radius * 0.028, radius * 0.03, radius * 0.035);
+  pupil.add(sparkle);
+
+  eyeRoot.add(white);
+  return { eyeRoot, pupilAnchor };
+}
+
 function addCuteFace(planetMesh, radius) {
-  const eyeGeometry = new THREE.SphereGeometry(radius * 0.11, 16, 16);
-  const eyeMaterial = new THREE.MeshStandardMaterial({ color: '#1f2a4a', roughness: 0.6 });
+  const leftEye = createEye(radius, -1);
+  const rightEye = createEye(radius, 1);
 
-  const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-  leftEye.position.set(-radius * 0.28, radius * 0.1, radius * 0.94);
-  const rightEye = leftEye.clone();
-  rightEye.position.x *= -1;
+  const smile = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 0.34, radius * 0.055, 20, 60, Math.PI * 0.92),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.4, metalness: 0.04 })
+  );
+  smile.position.set(0, -radius * 0.26, radius * 0.84);
+  smile.rotation.z = Math.PI;
 
-  const cheekGeometry = new THREE.SphereGeometry(radius * 0.08, 16, 16);
+  const smileShadow = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 0.34, radius * 0.022, 12, 48, Math.PI * 0.92),
+    new THREE.MeshStandardMaterial({ color: '#ff7faa', roughness: 0.65 })
+  );
+  smileShadow.position.set(0, -radius * 0.285, radius * 0.825);
+  smileShadow.rotation.z = Math.PI;
+
+  const cheekGeometry = new THREE.SphereGeometry(radius * 0.1, 16, 16);
   const cheekMaterial = new THREE.MeshStandardMaterial({ color: '#ffb7c9', roughness: 0.8 });
   const leftCheek = new THREE.Mesh(cheekGeometry, cheekMaterial);
-  leftCheek.position.set(-radius * 0.45, -radius * 0.08, radius * 0.88);
+  leftCheek.position.set(-radius * 0.5, -radius * 0.08, radius * 0.84);
   const rightCheek = leftCheek.clone();
   rightCheek.position.x *= -1;
 
-  planetMesh.add(leftEye, rightEye, leftCheek, rightCheek);
+  planetMesh.add(leftEye.eyeRoot, rightEye.eyeRoot, smile, smileShadow, leftCheek, rightCheek);
+
+  return {
+    eyeRoots: [leftEye.eyeRoot, rightEye.eyeRoot],
+    pupilAnchors: [leftEye.pupilAnchor, rightEye.pupilAnchor],
+    eyeRestScaleY: 1,
+    nextWinkAt: Math.random() * 4 + 2,
+    winkEyeIndex: Math.random() > 0.5 ? 1 : 0,
+    winkDuration: 0,
+    winkProgress: 0
+  };
 }
 
 function setActivePlanet(planet, options = {}) {
@@ -141,7 +191,7 @@ for (const [idx, config] of planetConfigs.entries()) {
     new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.9, metalness: 0.05 })
   );
 
-  addCuteFace(planet, config.size);
+  const faceData = addCuteFace(planet, config.size);
 
   if (config.name === 'Saturn') {
     const ring = new THREE.Mesh(
@@ -153,7 +203,7 @@ for (const [idx, config] of planetConfigs.entries()) {
   }
 
   planet.position.x = config.distance;
-  planet.userData = { ...config, idx, pivot };
+  planet.userData = { ...config, idx, pivot, faceData };
   pivot.add(planet);
   planets.push(planet);
 
@@ -191,14 +241,46 @@ window.addEventListener('resize', () => {
 });
 
 const clock = new THREE.Clock();
+let elapsedTime = 0;
 
 function animate() {
-  const elapsed = clock.getElapsedTime();
+  const delta = clock.getDelta();
+  elapsedTime += delta;
+  const elapsed = elapsedTime;
 
   planets.forEach((planet) => {
-    const { speed, idx, pivot } = planet.userData;
+    const { speed, idx, pivot, faceData } = planet.userData;
     pivot.rotation.y = elapsed * speed * 0.3;
     planet.rotation.y += 0.01 + idx * 0.0008;
+
+    planet.worldToLocal(worldCameraPosition.copy(camera.position));
+    const eyeLookX = THREE.MathUtils.clamp(worldCameraPosition.x / planet.userData.size, -0.5, 0.5);
+    const eyeLookY = THREE.MathUtils.clamp(worldCameraPosition.y / planet.userData.size, -0.35, 0.35);
+
+    faceData.pupilAnchors.forEach((pupilAnchor) => {
+      pupilAnchor.position.x = eyeLookX * planet.userData.size * 0.052;
+      pupilAnchor.position.y = eyeLookY * planet.userData.size * 0.045;
+    });
+
+    if (elapsed >= faceData.nextWinkAt) {
+      faceData.winkDuration = 0.22 + Math.random() * 0.22;
+      faceData.winkProgress = 0;
+      faceData.winkEyeIndex = Math.random() > 0.5 ? 1 : 0;
+      faceData.nextWinkAt = elapsed + 2.6 + Math.random() * 4.8;
+    }
+
+    if (faceData.winkProgress < faceData.winkDuration) {
+      faceData.winkProgress += delta;
+      const phase = faceData.winkProgress / faceData.winkDuration;
+      const blinkScale = 0.08 + Math.abs(Math.cos(phase * Math.PI)) * 0.92;
+      faceData.eyeRoots.forEach((eye, eyeIndex) => {
+        eye.scale.y = eyeIndex === faceData.winkEyeIndex ? blinkScale : faceData.eyeRestScaleY;
+      });
+    } else {
+      faceData.eyeRoots.forEach((eye) => {
+        eye.scale.y = faceData.eyeRestScaleY;
+      });
+    }
   });
 
   sun.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.03);
