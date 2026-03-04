@@ -15,5 +15,7 @@ Then open <http://localhost:4173>.
 The workflow in `.github/workflows/pages.yml` copies `index.html` and `src/` into a `dist/` artifact, then deploys through GitHub Pages on:
 
 - pushes to `main`
-- pull requests targeting `main`
+- pull requests targeting `main` (with preview deployments)
 - manual workflow dispatch
+
+For pull requests, the workflow posts/updates a comment with the preview URL so reviewers can open the page directly from the MR.
