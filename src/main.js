@@ -7,6 +7,13 @@ const planetName = document.querySelector('#planet-name');
 const planetDescription = document.querySelector('#planet-description');
 const prevPlanetButton = document.querySelector('#prev-planet');
 const nextPlanetButton = document.querySelector('#next-planet');
+const versionIndicator = document.querySelector('#version-indicator');
+
+const APP_VERSION = 'v2026.03.04.4';
+
+if (versionIndicator) {
+  versionIndicator.textContent = `Version: ${APP_VERSION}`;
+}
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -73,26 +80,229 @@ const planets = [];
 const buttonsByName = new Map();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
+const worldCameraPosition = new THREE.Vector3();
+const cameraTargetPosition = new THREE.Vector3();
+const cameraFocusPosition = new THREE.Vector3();
 let activeFocus = null;
 let activeIndex = 0;
 
+const cameraTransition = {
+  active: false,
+  duration: 0.72,
+  elapsed: 0,
+  startCamera: new THREE.Vector3(),
+  endCamera: new THREE.Vector3(),
+  startTarget: new THREE.Vector3(),
+  endTarget: new THREE.Vector3()
+};
+
+const currentFocusPlanetPosition = new THREE.Vector3();
+const previousFocusPlanetPosition = new THREE.Vector3();
+const focusPlanetDelta = new THREE.Vector3();
+let hasFocusReference = false;
+
+function createEye(radius, side) {
+  const eyeRoot = new THREE.Group();
+  eyeRoot.position.set(radius * 0.34 * side, radius * 0.16, radius * 0.92);
+
+  const white = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.16, 20, 20),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.45, metalness: 0.02 })
+  );
+
+  const pupilAnchor = new THREE.Group();
+  pupilAnchor.position.z = radius * 0.125;
+  white.add(pupilAnchor);
+
+  const pupil = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.07, 16, 16),
+    new THREE.MeshStandardMaterial({ color: '#0f1940', roughness: 0.4, metalness: 0.1 })
+  );
+  pupilAnchor.add(pupil);
+
+  const sparkle = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.02, 12, 12),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.25 })
+  );
+  sparkle.position.set(radius * 0.028, radius * 0.03, radius * 0.035);
+  pupil.add(sparkle);
+
+  eyeRoot.add(white);
+  return { eyeRoot, pupilAnchor };
+}
+
 function addCuteFace(planetMesh, radius) {
-  const eyeGeometry = new THREE.SphereGeometry(radius * 0.11, 16, 16);
-  const eyeMaterial = new THREE.MeshStandardMaterial({ color: '#1f2a4a', roughness: 0.6 });
+  const leftEye = createEye(radius, -1);
+  const rightEye = createEye(radius, 1);
 
-  const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-  leftEye.position.set(-radius * 0.28, radius * 0.1, radius * 0.94);
-  const rightEye = leftEye.clone();
-  rightEye.position.x *= -1;
+  const smile = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 0.34, radius * 0.055, 20, 60, Math.PI * 0.92),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.4, metalness: 0.04 })
+  );
+  smile.position.set(0, -radius * 0.26, radius * 0.84);
+  smile.rotation.z = Math.PI;
 
-  const cheekGeometry = new THREE.SphereGeometry(radius * 0.08, 16, 16);
+  const smileShadow = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 0.34, radius * 0.022, 12, 48, Math.PI * 0.92),
+    new THREE.MeshStandardMaterial({ color: '#ff7faa', roughness: 0.65 })
+  );
+  smileShadow.position.set(0, -radius * 0.285, radius * 0.825);
+  smileShadow.rotation.z = Math.PI;
+
+  const cheekGeometry = new THREE.SphereGeometry(radius * 0.1, 16, 16);
   const cheekMaterial = new THREE.MeshStandardMaterial({ color: '#ffb7c9', roughness: 0.8 });
   const leftCheek = new THREE.Mesh(cheekGeometry, cheekMaterial);
-  leftCheek.position.set(-radius * 0.45, -radius * 0.08, radius * 0.88);
+  leftCheek.position.set(-radius * 0.5, -radius * 0.08, radius * 0.84);
   const rightCheek = leftCheek.clone();
   rightCheek.position.x *= -1;
 
-  planetMesh.add(leftEye, rightEye, leftCheek, rightCheek);
+  planetMesh.add(leftEye.eyeRoot, rightEye.eyeRoot, smile, smileShadow, leftCheek, rightCheek);
+
+  return {
+    eyeRoots: [leftEye.eyeRoot, rightEye.eyeRoot],
+    pupilAnchors: [leftEye.pupilAnchor, rightEye.pupilAnchor],
+    eyeRestScaleY: 1,
+    nextWinkAt: Math.random() * 4 + 2,
+    winkEyeIndex: Math.random() > 0.5 ? 1 : 0,
+    winkDuration: 0,
+    winkProgress: 0
+  };
+}
+
+
+function addPlanetCharacter(planetMesh, config) {
+  const radius = config.size;
+
+  if (config.name === 'Mercury') {
+    const craterMaterial = new THREE.MeshStandardMaterial({ color: '#d3a67f', roughness: 0.95 });
+    const crater1 = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.26, 28), craterMaterial);
+    crater1.position.set(radius * 0.52, radius * 0.22, radius * 0.72);
+    crater1.rotation.y = -Math.PI * 0.18;
+
+    const crater2 = crater1.clone();
+    crater2.scale.setScalar(0.55);
+    crater2.position.set(-radius * 0.5, -radius * 0.08, radius * 0.76);
+    crater2.rotation.y = Math.PI * 0.24;
+
+    planetMesh.add(crater1, crater2);
+    return;
+  }
+
+  if (config.name === 'Venus') {
+    const cloudBandMaterial = new THREE.MeshStandardMaterial({
+      color: '#ffe8c4',
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide,
+      roughness: 0.75
+    });
+    const cloudBand = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.92, radius * 0.055, 12, 64), cloudBandMaterial);
+    cloudBand.rotation.x = Math.PI * 0.48;
+
+    const cloudBand2 = cloudBand.clone();
+    cloudBand2.scale.setScalar(0.78);
+    cloudBand2.rotation.x = Math.PI * 0.58;
+    cloudBand2.rotation.y = Math.PI * 0.2;
+
+    planetMesh.add(cloudBand, cloudBand2);
+    return;
+  }
+
+  if (config.name === 'Earth') {
+    const continentMaterial = new THREE.MeshStandardMaterial({ color: '#57b76a', roughness: 0.9 });
+    const continent1 = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.34, 18, 18), continentMaterial);
+    continent1.scale.set(1.15, 0.66, 0.35);
+    continent1.position.set(-radius * 0.45, radius * 0.02, radius * 0.76);
+
+    const continent2 = continent1.clone();
+    continent2.scale.set(0.85, 0.52, 0.3);
+    continent2.position.set(radius * 0.45, radius * 0.24, radius * 0.7);
+
+    const continent3 = continent1.clone();
+    continent3.scale.set(0.74, 0.44, 0.28);
+    continent3.position.set(radius * 0.02, -radius * 0.42, radius * 0.73);
+
+    planetMesh.add(continent1, continent2, continent3);
+    return;
+  }
+
+  if (config.name === 'Mars') {
+    const olympusMons = new THREE.Mesh(
+      new THREE.ConeGeometry(radius * 0.26, radius * 0.28, 28),
+      new THREE.MeshStandardMaterial({ color: '#de7f64', roughness: 0.9 })
+    );
+    olympusMons.position.set(radius * 0.48, radius * 0.36, radius * 0.66);
+    olympusMons.lookAt(radius * 0.9, radius * 0.66, radius * 1.5);
+
+    const caldera = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.085, radius * 0.085, radius * 0.04, 18),
+      new THREE.MeshStandardMaterial({ color: '#b95f4a', roughness: 0.95 })
+    );
+    caldera.position.set(radius * 0.48, radius * 0.5, radius * 0.74);
+
+    planetMesh.add(olympusMons, caldera);
+    return;
+  }
+
+  if (config.name === 'Jupiter') {
+    const stripeMaterial = new THREE.MeshStandardMaterial({ color: '#f0ba9f', roughness: 0.84, transparent: true, opacity: 0.92 });
+    const stripe = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.96, radius * 0.085, 12, 96), stripeMaterial);
+    stripe.rotation.x = Math.PI / 2;
+
+    const stripe2 = stripe.clone();
+    stripe2.scale.set(0.84, 0.84, 0.84);
+    stripe2.rotation.z = Math.PI * 0.1;
+
+    const redSpot = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 0.29, 24, 24),
+      new THREE.MeshStandardMaterial({ color: '#d9624e', roughness: 0.85 })
+    );
+    redSpot.scale.set(1.5, 0.76, 0.35);
+    redSpot.position.set(radius * 0.66, -radius * 0.05, radius * 0.58);
+
+    planetMesh.add(stripe, stripe2, redSpot);
+    return;
+  }
+
+  if (config.name === 'Saturn') {
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * 0.82, radius * 0.05, 10, 80),
+      new THREE.MeshStandardMaterial({ color: '#e7cf8d', roughness: 0.88, transparent: true, opacity: 0.78 })
+    );
+    band.rotation.x = Math.PI / 2;
+    planetMesh.add(band);
+    return;
+  }
+
+  if (config.name === 'Uranus') {
+    const iceCapMaterial = new THREE.MeshStandardMaterial({ color: '#d8f8ff', roughness: 0.7, transparent: true, opacity: 0.9 });
+    const capNorth = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.36, 20, 20), iceCapMaterial);
+    capNorth.scale.set(1.2, 0.5, 1.2);
+    capNorth.position.set(0, radius * 0.78, 0);
+
+    const capSouth = capNorth.clone();
+    capSouth.position.y *= -1;
+
+    planetMesh.add(capNorth, capSouth);
+    return;
+  }
+
+  if (config.name === 'Neptune') {
+    const windBand = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * 0.92, radius * 0.06, 12, 80),
+      new THREE.MeshStandardMaterial({ color: '#7aa7ff', roughness: 0.82, transparent: true, opacity: 0.8 })
+    );
+    windBand.rotation.x = Math.PI / 2;
+
+    const darkSpot = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 0.26, 20, 20),
+      new THREE.MeshStandardMaterial({ color: '#4568c7', roughness: 0.9 })
+    );
+    darkSpot.scale.set(1.35, 0.85, 0.34);
+    darkSpot.position.set(-radius * 0.56, radius * 0.18, radius * 0.64);
+
+    planetMesh.add(windBand, darkSpot);
+  }
 }
 
 function setActivePlanet(planet, options = {}) {
@@ -107,17 +317,26 @@ function setActivePlanet(planet, options = {}) {
     button.classList.toggle('active', name === planet.userData.name);
   });
 
-  if (snap) {
-    const planetPosition = new THREE.Vector3();
-    activeFocus.getWorldPosition(planetPosition);
-    const snappedCameraPosition = planetPosition
-      .clone()
-      .add(new THREE.Vector3(0, activeFocus.userData.size * 1.6, activeFocus.userData.size * 4.6));
+  activeFocus.getWorldPosition(cameraFocusPosition);
+  cameraTargetPosition.copy(cameraFocusPosition).add(new THREE.Vector3(0, activeFocus.userData.size * 1.6, activeFocus.userData.size * 4.6));
 
-    camera.position.copy(snappedCameraPosition);
-    controls.target.copy(planetPosition);
+  if (snap) {
+    camera.position.copy(cameraTargetPosition);
+    controls.target.copy(cameraFocusPosition);
     controls.update();
+    cameraTransition.active = false;
+    previousFocusPlanetPosition.copy(cameraFocusPosition);
+    hasFocusReference = true;
+    return;
   }
+
+  cameraTransition.active = true;
+  cameraTransition.elapsed = 0;
+  cameraTransition.startCamera.copy(camera.position);
+  cameraTransition.endCamera.copy(cameraTargetPosition);
+  cameraTransition.startTarget.copy(controls.target);
+  cameraTransition.endTarget.copy(cameraFocusPosition);
+  hasFocusReference = false;
 }
 
 function focusRelativePlanet(direction) {
@@ -141,7 +360,8 @@ for (const [idx, config] of planetConfigs.entries()) {
     new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.9, metalness: 0.05 })
   );
 
-  addCuteFace(planet, config.size);
+  addPlanetCharacter(planet, config);
+  const faceData = addCuteFace(planet, config.size);
 
   if (config.name === 'Saturn') {
     const ring = new THREE.Mesh(
@@ -153,7 +373,7 @@ for (const [idx, config] of planetConfigs.entries()) {
   }
 
   planet.position.x = config.distance;
-  planet.userData = { ...config, idx, pivot };
+  planet.userData = { ...config, idx, pivot, faceData };
   pivot.add(planet);
   planets.push(planet);
 
@@ -190,26 +410,81 @@ window.addEventListener('resize', () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
 
+controls.addEventListener('start', () => {
+  cameraTransition.active = false;
+});
+
 const clock = new THREE.Clock();
+let elapsedTime = 0;
 
 function animate() {
-  const elapsed = clock.getElapsedTime();
+  const delta = clock.getDelta();
+  elapsedTime += delta;
+  const elapsed = elapsedTime;
 
   planets.forEach((planet) => {
-    const { speed, idx, pivot } = planet.userData;
+    const { speed, idx, pivot, faceData } = planet.userData;
     pivot.rotation.y = elapsed * speed * 0.3;
     planet.rotation.y += 0.01 + idx * 0.0008;
+
+    planet.worldToLocal(worldCameraPosition.copy(camera.position));
+    const eyeLookX = THREE.MathUtils.clamp(worldCameraPosition.x / planet.userData.size, -0.5, 0.5);
+    const eyeLookY = THREE.MathUtils.clamp(worldCameraPosition.y / planet.userData.size, -0.35, 0.35);
+
+    faceData.pupilAnchors.forEach((pupilAnchor) => {
+      pupilAnchor.position.x = eyeLookX * planet.userData.size * 0.052;
+      pupilAnchor.position.y = eyeLookY * planet.userData.size * 0.045;
+    });
+
+    if (elapsed >= faceData.nextWinkAt) {
+      faceData.winkDuration = 0.22 + Math.random() * 0.22;
+      faceData.winkProgress = 0;
+      faceData.winkEyeIndex = Math.random() > 0.5 ? 1 : 0;
+      faceData.nextWinkAt = elapsed + 2.6 + Math.random() * 4.8;
+    }
+
+    if (faceData.winkProgress < faceData.winkDuration) {
+      faceData.winkProgress += delta;
+      const phase = faceData.winkProgress / faceData.winkDuration;
+      const blinkScale = 0.08 + Math.abs(Math.cos(phase * Math.PI)) * 0.92;
+      faceData.eyeRoots.forEach((eye, eyeIndex) => {
+        eye.scale.y = eyeIndex === faceData.winkEyeIndex ? blinkScale : faceData.eyeRestScaleY;
+      });
+    } else {
+      faceData.eyeRoots.forEach((eye) => {
+        eye.scale.y = faceData.eyeRestScaleY;
+      });
+    }
   });
 
   sun.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.03);
 
   if (activeFocus) {
-    const planetPosition = new THREE.Vector3();
-    activeFocus.getWorldPosition(planetPosition);
-    const idealPosition = planetPosition.clone().add(new THREE.Vector3(0, activeFocus.userData.size * 1.6, activeFocus.userData.size * 4.6));
+    activeFocus.getWorldPosition(currentFocusPlanetPosition);
 
-    camera.position.lerp(idealPosition, 0.04);
-    controls.target.lerp(planetPosition, 0.08);
+    if (!hasFocusReference) {
+      previousFocusPlanetPosition.copy(currentFocusPlanetPosition);
+      hasFocusReference = true;
+    }
+
+    if (cameraTransition.active) {
+      cameraTransition.elapsed += delta;
+      const linearT = Math.min(cameraTransition.elapsed / cameraTransition.duration, 1);
+      const easedT = 1 - (1 - linearT) ** 3;
+
+      camera.position.lerpVectors(cameraTransition.startCamera, cameraTransition.endCamera, easedT);
+      controls.target.lerpVectors(cameraTransition.startTarget, cameraTransition.endTarget, easedT);
+
+      if (linearT >= 1) {
+        cameraTransition.active = false;
+      }
+    } else {
+      focusPlanetDelta.subVectors(currentFocusPlanetPosition, previousFocusPlanetPosition);
+      camera.position.add(focusPlanetDelta);
+      controls.target.add(focusPlanetDelta);
+    }
+
+    previousFocusPlanetPosition.copy(currentFocusPlanetPosition);
   }
 
   controls.update();
