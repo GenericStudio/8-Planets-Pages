@@ -7,6 +7,13 @@ const planetName = document.querySelector('#planet-name');
 const planetDescription = document.querySelector('#planet-description');
 const prevPlanetButton = document.querySelector('#prev-planet');
 const nextPlanetButton = document.querySelector('#next-planet');
+const versionIndicator = document.querySelector('#version-indicator');
+
+const APP_VERSION = 'v2026.03.04.4';
+
+if (versionIndicator) {
+  versionIndicator.textContent = `Version: ${APP_VERSION}`;
+}
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
