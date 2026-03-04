@@ -24,10 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build static site artifact
+      - name: Build static Pages artifact
         run: |
-          mkdir -p dist
-          cp -r index.html src dist/
+          rm -rf dist
+          mkdir -p dist/src
+          cp index.html dist/index.html
+          cp src/main.js src/style.css dist/src/
+          touch dist/.nojekyll
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

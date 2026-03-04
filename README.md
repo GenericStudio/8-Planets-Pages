@@ -12,10 +12,12 @@ Then open <http://localhost:4173>.
 
 ## GitHub Pages + PR builds
 
-The workflow in `.github/workflows/pages.yml` copies `index.html` and `src/` into a `dist/` artifact, then deploys through GitHub Pages on:
+The workflow in `.github/workflows/pages.yml` builds a static Pages artifact in GitHub Actions and deploys it through GitHub Pages on:
 
 - pushes to `main`
 - pull requests targeting `main` (with preview deployments)
 - manual workflow dispatch
 
 For pull requests, the workflow posts/updates a comment with the preview URL so reviewers can open the page directly from the MR.
+
+> Pages source should be set to **GitHub Actions** in repository settings.
