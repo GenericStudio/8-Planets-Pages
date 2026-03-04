@@ -1,0 +1,48 @@
+:root {
+  font-family: "Inter", "Avenir", "Segoe UI", sans-serif;
+  color-scheme: dark;
+  background: radial-gradient(circle at top, #0b1336 0%, #050816 60%, #03040a 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hud {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 2;
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.8rem 1rem;
+  border-radius: 0.85rem;
+  background: rgb(8 12 34 / 58%);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgb(166 191 255 / 35%);
+}
+
+.hud h1 {
+  margin: 0;
+  font-size: clamp(1rem, 2.4vw, 1.4rem);
+}
+
+.hud p {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  color: #d6ddff;
+}
