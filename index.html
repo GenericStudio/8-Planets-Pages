@@ -10,11 +10,15 @@
     <div id="app">
       <div class="hud">
         <h1>Cutsie Planet Explorer</h1>
-        <p>Drag to orbit. Scroll to zoom. Double-click a planet or use the planet list to focus.</p>
+        <p>Drag to orbit. Scroll to zoom. Use previous/next or double-click a planet to focus.</p>
       </div>
 
       <aside class="planet-panel" aria-label="Planet selector">
         <h2>Planets</h2>
+        <div class="planet-nav" aria-label="Sequential planet navigation">
+          <button id="prev-planet" type="button">← Previous</button>
+          <button id="next-planet" type="button">Next →</button>
+        </div>
         <div id="planet-buttons" class="planet-buttons"></div>
         <article class="planet-details">
           <h3 id="planet-name">Select a planet</h3>
