@@ -2,6 +2,10 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.m
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.176.0/examples/jsm/controls/OrbitControls.js';
 
 const canvas = document.querySelector('#scene');
+const planetButtonsContainer = document.querySelector('#planet-buttons');
+const planetName = document.querySelector('#planet-name');
+const planetDescription = document.querySelector('#planet-description');
+
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -53,17 +57,18 @@ const sun = new THREE.Mesh(
 scene.add(sun);
 
 const planetConfigs = [
-  { name: 'Mercury', size: 1.2, distance: 11, color: '#f2c89b', speed: 1.6 },
-  { name: 'Venus', size: 1.65, distance: 17, color: '#ffd9a8', speed: 1.2 },
-  { name: 'Earth', size: 1.8, distance: 24, color: '#9ed2ff', speed: 1.0 },
-  { name: 'Mars', size: 1.4, distance: 31, color: '#ffac8e', speed: 0.82 },
-  { name: 'Jupiter', size: 3.8, distance: 44, color: '#ffd4ba', speed: 0.45 },
-  { name: 'Saturn', size: 3.4, distance: 58, color: '#f9e4af', speed: 0.34 },
-  { name: 'Uranus', size: 2.5, distance: 72, color: '#aeeaff', speed: 0.26 },
-  { name: 'Neptune', size: 2.4, distance: 86, color: '#9db8ff', speed: 0.22 }
+  { name: 'Mercury', size: 1.2, distance: 11, color: '#f2c89b', speed: 1.6, fact: 'Fast little bean and closest to the Sun.' },
+  { name: 'Venus', size: 1.65, distance: 17, color: '#ffd9a8', speed: 1.2, fact: 'Thick clouds and the hottest planet vibes.' },
+  { name: 'Earth', size: 1.8, distance: 24, color: '#9ed2ff', speed: 1.0, fact: 'Our cozy blue marble home.' },
+  { name: 'Mars', size: 1.4, distance: 31, color: '#ffac8e', speed: 0.82, fact: 'Dusty red adventurer with giant volcanoes.' },
+  { name: 'Jupiter', size: 3.8, distance: 44, color: '#ffd4ba', speed: 0.45, fact: 'Huge stormy giant with a famous red spot.' },
+  { name: 'Saturn', size: 3.4, distance: 58, color: '#f9e4af', speed: 0.34, fact: 'Ring champion of the solar system.' },
+  { name: 'Uranus', size: 2.5, distance: 72, color: '#aeeaff', speed: 0.26, fact: 'Icy giant that spins tipped on its side.' },
+  { name: 'Neptune', size: 2.4, distance: 86, color: '#9db8ff', speed: 0.22, fact: 'Deep blue and super windy at the edge.' }
 ];
 
 const planets = [];
+const buttonsByName = new Map();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let activeFocus = null;
@@ -85,6 +90,16 @@ function addCuteFace(planetMesh, radius) {
   rightCheek.position.x *= -1;
 
   planetMesh.add(leftEye, rightEye, leftCheek, rightCheek);
+}
+
+function setActivePlanet(planet) {
+  activeFocus = planet;
+  planetName.textContent = planet.userData.name;
+  planetDescription.textContent = planet.userData.fact;
+
+  buttonsByName.forEach((button, name) => {
+    button.classList.toggle('active', name === planet.userData.name);
+  });
 }
 
 for (const [idx, config] of planetConfigs.entries()) {
@@ -118,7 +133,18 @@ for (const [idx, config] of planetConfigs.entries()) {
   planet.userData = { ...config, idx, pivot };
   pivot.add(planet);
   planets.push(planet);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'planet-button';
+  button.textContent = config.name;
+  button.style.setProperty('--planet-color', config.color);
+  button.addEventListener('click', () => setActivePlanet(planet));
+  planetButtonsContainer.append(button);
+  buttonsByName.set(config.name, button);
 }
+
+setActivePlanet(planets[2]);
 
 window.addEventListener('dblclick', (event) => {
   pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -127,7 +153,7 @@ window.addEventListener('dblclick', (event) => {
 
   const hits = raycaster.intersectObjects(planets, false);
   if (hits.length > 0) {
-    activeFocus = hits[0].object;
+    setActivePlanet(hits[0].object);
   }
 });
 

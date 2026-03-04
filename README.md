@@ -10,6 +10,8 @@ python3 -m http.server 4173
 
 Then open <http://localhost:4173>.
 
+Use the in-app planet panel (top-right) to jump to Mercury through Neptune.
+
 ## GitHub Pages + PR builds
 
 The workflow in `.github/workflows/pages.yml` builds a static Pages artifact in GitHub Actions and deploys it through GitHub Pages on:
