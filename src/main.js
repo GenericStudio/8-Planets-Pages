@@ -81,8 +81,20 @@ const buttonsByName = new Map();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const worldCameraPosition = new THREE.Vector3();
+const cameraTargetPosition = new THREE.Vector3();
+const cameraFocusPosition = new THREE.Vector3();
 let activeFocus = null;
 let activeIndex = 0;
+
+const cameraTransition = {
+  active: false,
+  duration: 0.72,
+  elapsed: 0,
+  startCamera: new THREE.Vector3(),
+  endCamera: new THREE.Vector3(),
+  startTarget: new THREE.Vector3(),
+  endTarget: new THREE.Vector3()
+};
 
 function createEye(radius, side) {
   const eyeRoot = new THREE.Group();
@@ -300,17 +312,23 @@ function setActivePlanet(planet, options = {}) {
     button.classList.toggle('active', name === planet.userData.name);
   });
 
-  if (snap) {
-    const planetPosition = new THREE.Vector3();
-    activeFocus.getWorldPosition(planetPosition);
-    const snappedCameraPosition = planetPosition
-      .clone()
-      .add(new THREE.Vector3(0, activeFocus.userData.size * 1.6, activeFocus.userData.size * 4.6));
+  activeFocus.getWorldPosition(cameraFocusPosition);
+  cameraTargetPosition.copy(cameraFocusPosition).add(new THREE.Vector3(0, activeFocus.userData.size * 1.6, activeFocus.userData.size * 4.6));
 
-    camera.position.copy(snappedCameraPosition);
-    controls.target.copy(planetPosition);
+  if (snap) {
+    camera.position.copy(cameraTargetPosition);
+    controls.target.copy(cameraFocusPosition);
     controls.update();
+    cameraTransition.active = false;
+    return;
   }
+
+  cameraTransition.active = true;
+  cameraTransition.elapsed = 0;
+  cameraTransition.startCamera.copy(camera.position);
+  cameraTransition.endCamera.copy(cameraTargetPosition);
+  cameraTransition.startTarget.copy(controls.target);
+  cameraTransition.endTarget.copy(cameraFocusPosition);
 }
 
 function focusRelativePlanet(direction) {
@@ -384,6 +402,10 @@ window.addEventListener('resize', () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
 
+controls.addEventListener('start', () => {
+  cameraTransition.active = false;
+});
+
 const clock = new THREE.Clock();
 let elapsedTime = 0;
 
@@ -429,13 +451,17 @@ function animate() {
 
   sun.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.03);
 
-  if (activeFocus) {
-    const planetPosition = new THREE.Vector3();
-    activeFocus.getWorldPosition(planetPosition);
-    const idealPosition = planetPosition.clone().add(new THREE.Vector3(0, activeFocus.userData.size * 1.6, activeFocus.userData.size * 4.6));
+  if (cameraTransition.active) {
+    cameraTransition.elapsed += delta;
+    const linearT = Math.min(cameraTransition.elapsed / cameraTransition.duration, 1);
+    const easedT = 1 - (1 - linearT) ** 3;
 
-    camera.position.lerp(idealPosition, 0.04);
-    controls.target.lerp(planetPosition, 0.08);
+    camera.position.lerpVectors(cameraTransition.startCamera, cameraTransition.endCamera, easedT);
+    controls.target.lerpVectors(cameraTransition.startTarget, cameraTransition.endTarget, easedT);
+
+    if (linearT >= 1) {
+      cameraTransition.active = false;
+    }
   }
 
   controls.update();
