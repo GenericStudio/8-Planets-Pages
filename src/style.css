@@ -151,6 +151,37 @@ body,
   font-size: 0.9rem;
 }
 
+
+#labels-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.space-label {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transform: translate(-50%, -50%);
+  color: #f4f7ff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px rgb(99 130 255 / 55%);
+  white-space: nowrap;
+}
+
+.space-label::before {
+  content: '';
+  width: 1.2rem;
+  height: 1px;
+  background: color-mix(in srgb, currentColor 70%, white);
+  opacity: 0.9;
+}
+
 @media (max-width: 800px) {
   .hud {
     max-width: calc(100vw - 2rem);
