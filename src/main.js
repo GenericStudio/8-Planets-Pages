@@ -1,10 +1,12 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.176.0/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const canvas = document.querySelector('#scene');
 const planetButtonsContainer = document.querySelector('#planet-buttons');
 const planetName = document.querySelector('#planet-name');
 const planetDescription = document.querySelector('#planet-description');
+const prevPlanetButton = document.querySelector('#prev-planet');
+const nextPlanetButton = document.querySelector('#next-planet');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -72,6 +74,7 @@ const buttonsByName = new Map();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let activeFocus = null;
+let activeIndex = 0;
 
 function addCuteFace(planetMesh, radius) {
   const eyeGeometry = new THREE.SphereGeometry(radius * 0.11, 16, 16);
@@ -92,14 +95,34 @@ function addCuteFace(planetMesh, radius) {
   planetMesh.add(leftEye, rightEye, leftCheek, rightCheek);
 }
 
-function setActivePlanet(planet) {
+function setActivePlanet(planet, options = {}) {
+  const { snap = false } = options;
+
   activeFocus = planet;
+  activeIndex = planet.userData.idx;
   planetName.textContent = planet.userData.name;
   planetDescription.textContent = planet.userData.fact;
 
   buttonsByName.forEach((button, name) => {
     button.classList.toggle('active', name === planet.userData.name);
   });
+
+  if (snap) {
+    const planetPosition = new THREE.Vector3();
+    activeFocus.getWorldPosition(planetPosition);
+    const snappedCameraPosition = planetPosition
+      .clone()
+      .add(new THREE.Vector3(0, activeFocus.userData.size * 1.6, activeFocus.userData.size * 4.6));
+
+    camera.position.copy(snappedCameraPosition);
+    controls.target.copy(planetPosition);
+    controls.update();
+  }
+}
+
+function focusRelativePlanet(direction) {
+  const nextIndex = (activeIndex + direction + planets.length) % planets.length;
+  setActivePlanet(planets[nextIndex]);
 }
 
 for (const [idx, config] of planetConfigs.entries()) {
@@ -144,7 +167,10 @@ for (const [idx, config] of planetConfigs.entries()) {
   buttonsByName.set(config.name, button);
 }
 
-setActivePlanet(planets[2]);
+setActivePlanet(planets[2], { snap: true });
+
+prevPlanetButton?.addEventListener('click', () => focusRelativePlanet(-1));
+nextPlanetButton?.addEventListener('click', () => focusRelativePlanet(1));
 
 window.addEventListener('dblclick', (event) => {
   pointer.x = (event.clientX / window.innerWidth) * 2 - 1;

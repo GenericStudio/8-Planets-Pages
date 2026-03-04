@@ -71,6 +71,30 @@ body,
   gap: 0.5rem;
 }
 
+.planet-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.planet-nav button {
+  border: 1px solid rgb(175 190 255 / 35%);
+  border-radius: 0.55rem;
+  background: rgb(15 23 55 / 88%);
+  color: #ecf0ff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.5rem;
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.planet-nav button:hover {
+  transform: translateY(-1px);
+  border-color: rgb(202 214 255 / 80%);
+}
+
 .planet-button {
   border: 1px solid rgb(175 190 255 / 35%);
   border-radius: 0.6rem;
