@@ -145,6 +145,142 @@ function addCuteFace(planetMesh, radius) {
   };
 }
 
+
+function addPlanetCharacter(planetMesh, config) {
+  const radius = config.size;
+
+  if (config.name === 'Mercury') {
+    const craterMaterial = new THREE.MeshStandardMaterial({ color: '#d3a67f', roughness: 0.95 });
+    const crater1 = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.26, 28), craterMaterial);
+    crater1.position.set(radius * 0.52, radius * 0.22, radius * 0.72);
+    crater1.rotation.y = -Math.PI * 0.18;
+
+    const crater2 = crater1.clone();
+    crater2.scale.setScalar(0.55);
+    crater2.position.set(-radius * 0.5, -radius * 0.08, radius * 0.76);
+    crater2.rotation.y = Math.PI * 0.24;
+
+    planetMesh.add(crater1, crater2);
+    return;
+  }
+
+  if (config.name === 'Venus') {
+    const cloudBandMaterial = new THREE.MeshStandardMaterial({
+      color: '#ffe8c4',
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide,
+      roughness: 0.75
+    });
+    const cloudBand = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.92, radius * 0.055, 12, 64), cloudBandMaterial);
+    cloudBand.rotation.x = Math.PI * 0.48;
+
+    const cloudBand2 = cloudBand.clone();
+    cloudBand2.scale.setScalar(0.78);
+    cloudBand2.rotation.x = Math.PI * 0.58;
+    cloudBand2.rotation.y = Math.PI * 0.2;
+
+    planetMesh.add(cloudBand, cloudBand2);
+    return;
+  }
+
+  if (config.name === 'Earth') {
+    const continentMaterial = new THREE.MeshStandardMaterial({ color: '#57b76a', roughness: 0.9 });
+    const continent1 = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.34, 18, 18), continentMaterial);
+    continent1.scale.set(1.15, 0.66, 0.35);
+    continent1.position.set(-radius * 0.45, radius * 0.02, radius * 0.76);
+
+    const continent2 = continent1.clone();
+    continent2.scale.set(0.85, 0.52, 0.3);
+    continent2.position.set(radius * 0.45, radius * 0.24, radius * 0.7);
+
+    const continent3 = continent1.clone();
+    continent3.scale.set(0.74, 0.44, 0.28);
+    continent3.position.set(radius * 0.02, -radius * 0.42, radius * 0.73);
+
+    planetMesh.add(continent1, continent2, continent3);
+    return;
+  }
+
+  if (config.name === 'Mars') {
+    const olympusMons = new THREE.Mesh(
+      new THREE.ConeGeometry(radius * 0.26, radius * 0.28, 28),
+      new THREE.MeshStandardMaterial({ color: '#de7f64', roughness: 0.9 })
+    );
+    olympusMons.position.set(radius * 0.48, radius * 0.36, radius * 0.66);
+    olympusMons.lookAt(radius * 0.9, radius * 0.66, radius * 1.5);
+
+    const caldera = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.085, radius * 0.085, radius * 0.04, 18),
+      new THREE.MeshStandardMaterial({ color: '#b95f4a', roughness: 0.95 })
+    );
+    caldera.position.set(radius * 0.48, radius * 0.5, radius * 0.74);
+
+    planetMesh.add(olympusMons, caldera);
+    return;
+  }
+
+  if (config.name === 'Jupiter') {
+    const stripeMaterial = new THREE.MeshStandardMaterial({ color: '#f0ba9f', roughness: 0.84, transparent: true, opacity: 0.92 });
+    const stripe = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.96, radius * 0.085, 12, 96), stripeMaterial);
+    stripe.rotation.x = Math.PI / 2;
+
+    const stripe2 = stripe.clone();
+    stripe2.scale.set(0.84, 0.84, 0.84);
+    stripe2.rotation.z = Math.PI * 0.1;
+
+    const redSpot = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 0.29, 24, 24),
+      new THREE.MeshStandardMaterial({ color: '#d9624e', roughness: 0.85 })
+    );
+    redSpot.scale.set(1.5, 0.76, 0.35);
+    redSpot.position.set(radius * 0.66, -radius * 0.05, radius * 0.58);
+
+    planetMesh.add(stripe, stripe2, redSpot);
+    return;
+  }
+
+  if (config.name === 'Saturn') {
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * 0.82, radius * 0.05, 10, 80),
+      new THREE.MeshStandardMaterial({ color: '#e7cf8d', roughness: 0.88, transparent: true, opacity: 0.78 })
+    );
+    band.rotation.x = Math.PI / 2;
+    planetMesh.add(band);
+    return;
+  }
+
+  if (config.name === 'Uranus') {
+    const iceCapMaterial = new THREE.MeshStandardMaterial({ color: '#d8f8ff', roughness: 0.7, transparent: true, opacity: 0.9 });
+    const capNorth = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.36, 20, 20), iceCapMaterial);
+    capNorth.scale.set(1.2, 0.5, 1.2);
+    capNorth.position.set(0, radius * 0.78, 0);
+
+    const capSouth = capNorth.clone();
+    capSouth.position.y *= -1;
+
+    planetMesh.add(capNorth, capSouth);
+    return;
+  }
+
+  if (config.name === 'Neptune') {
+    const windBand = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * 0.92, radius * 0.06, 12, 80),
+      new THREE.MeshStandardMaterial({ color: '#7aa7ff', roughness: 0.82, transparent: true, opacity: 0.8 })
+    );
+    windBand.rotation.x = Math.PI / 2;
+
+    const darkSpot = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 0.26, 20, 20),
+      new THREE.MeshStandardMaterial({ color: '#4568c7', roughness: 0.9 })
+    );
+    darkSpot.scale.set(1.35, 0.85, 0.34);
+    darkSpot.position.set(-radius * 0.56, radius * 0.18, radius * 0.64);
+
+    planetMesh.add(windBand, darkSpot);
+  }
+}
+
 function setActivePlanet(planet, options = {}) {
   const { snap = false } = options;
 
@@ -191,6 +327,7 @@ for (const [idx, config] of planetConfigs.entries()) {
     new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.9, metalness: 0.05 })
   );
 
+  addPlanetCharacter(planet, config);
   const faceData = addCuteFace(planet, config.size);
 
   if (config.name === 'Saturn') {
