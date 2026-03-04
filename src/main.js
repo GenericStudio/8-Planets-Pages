@@ -96,6 +96,11 @@ const cameraTransition = {
   endTarget: new THREE.Vector3()
 };
 
+const currentFocusPlanetPosition = new THREE.Vector3();
+const previousFocusPlanetPosition = new THREE.Vector3();
+const focusPlanetDelta = new THREE.Vector3();
+let hasFocusReference = false;
+
 function createEye(radius, side) {
   const eyeRoot = new THREE.Group();
   eyeRoot.position.set(radius * 0.34 * side, radius * 0.16, radius * 0.92);
@@ -320,6 +325,8 @@ function setActivePlanet(planet, options = {}) {
     controls.target.copy(cameraFocusPosition);
     controls.update();
     cameraTransition.active = false;
+    previousFocusPlanetPosition.copy(cameraFocusPosition);
+    hasFocusReference = true;
     return;
   }
 
@@ -329,6 +336,7 @@ function setActivePlanet(planet, options = {}) {
   cameraTransition.endCamera.copy(cameraTargetPosition);
   cameraTransition.startTarget.copy(controls.target);
   cameraTransition.endTarget.copy(cameraFocusPosition);
+  hasFocusReference = false;
 }
 
 function focusRelativePlanet(direction) {
@@ -451,17 +459,32 @@ function animate() {
 
   sun.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.03);
 
-  if (cameraTransition.active) {
-    cameraTransition.elapsed += delta;
-    const linearT = Math.min(cameraTransition.elapsed / cameraTransition.duration, 1);
-    const easedT = 1 - (1 - linearT) ** 3;
+  if (activeFocus) {
+    activeFocus.getWorldPosition(currentFocusPlanetPosition);
 
-    camera.position.lerpVectors(cameraTransition.startCamera, cameraTransition.endCamera, easedT);
-    controls.target.lerpVectors(cameraTransition.startTarget, cameraTransition.endTarget, easedT);
-
-    if (linearT >= 1) {
-      cameraTransition.active = false;
+    if (!hasFocusReference) {
+      previousFocusPlanetPosition.copy(currentFocusPlanetPosition);
+      hasFocusReference = true;
     }
+
+    if (cameraTransition.active) {
+      cameraTransition.elapsed += delta;
+      const linearT = Math.min(cameraTransition.elapsed / cameraTransition.duration, 1);
+      const easedT = 1 - (1 - linearT) ** 3;
+
+      camera.position.lerpVectors(cameraTransition.startCamera, cameraTransition.endCamera, easedT);
+      controls.target.lerpVectors(cameraTransition.startTarget, cameraTransition.endTarget, easedT);
+
+      if (linearT >= 1) {
+        cameraTransition.active = false;
+      }
+    } else {
+      focusPlanetDelta.subVectors(currentFocusPlanetPosition, previousFocusPlanetPosition);
+      camera.position.add(focusPlanetDelta);
+      controls.target.add(focusPlanetDelta);
+    }
+
+    previousFocusPlanetPosition.copy(currentFocusPlanetPosition);
   }
 
   controls.update();
